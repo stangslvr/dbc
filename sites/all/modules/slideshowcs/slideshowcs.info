@@ -1,0 +1,15 @@
+; $Id: slideshowcs.info,v 1.1.2.1 2008/12/11 21:58:35 davebv Exp $
+name = Slideshow CS
+description = A slideshow block with cool effects using jQuery plugin: Cross-slide
+core = 6.x
+; Possible dependencies in the future.
+;dependencies[] = jq
+;dependencies[] = jquery_update
+;dependencies[] = jquery_plugin
+package = "User interface"
+; Information added by drupal.org packaging script on 2010-06-06
+version = "6.x-2.11"
+core = "6.x"
+project = "slideshowcs"
+datestamp = "1275815422"
+

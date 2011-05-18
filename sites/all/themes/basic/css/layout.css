@@ -1,0 +1,152 @@
+
+/** Layout
+---------------------------------
+*  Using a negative margin technique, adapted from ZEN. The page is loaded by this order:
+*  
+*  1. Header
+*  2. Content
+*  3. Navigation menus
+*  4. Sidebar Left
+*  5. Sideabr Right
+*	
+*/
+
+#page {
+	width: 960px; /* edit to change the width of the page */
+	margin: 0 auto; /* remove 'auto' and the width to switch to a fluid width */
+}
+
+/** LAYOUT RULES
+---------------------------------
+*  do not change if you're not sure you know what you're doing
+*/
+
+#content {
+  float: left;
+  width: 100%;
+  margin-right: -100%;
+  padding: 0;
+}
+.sidebar {
+  float: left;
+}
+#sidebar-second {
+  float: right;
+}
+#footer {
+ 	clear: both;
+    color: black;
+    float: none;
+    font-family: arial,tahoma;
+    font-size: 12px;
+    font-weight: bold;
+    margin-top: 15px;
+	margin-left: 15px;
+}
+
+ul.links li {
+    border-right: 1px solid black;
+    display: inline;
+    list-style-type: none;
+    padding: 0 10px;
+}
+ul.links li.last{
+    border-right:none;
+
+}
+
+/* Layout Helpers */
+
+#header, #footer, .mission, .breadcrumb, .node {
+  clear: both;
+}
+
+/** Sidebars width
+---------------------------------
+*  Changing the width of the sidebars is dead easy, just change the
+*  values below corresponding to the sidebar you want to modify.
+*  Make sure you keep negative values as negative values.
+*  For example, if I want to increase the width of the left sidebar
+*  to 300px, I would have to change each '190' to '300'.
+*/
+
+.two-sidebars .center,
+.sidebar-left .center {
+  margin-left: 305px;     /* LEFT value */
+}
+#sidebar-first {
+    border-right: 1px solid white;
+    margin-right: -290px;
+    padding-right: 7px;
+    width: 275px;
+	padding-bottom: 100px;
+}
+.two-sidebars .center,
+.sidebar-right .center {
+  margin-right: 200px;    /* RIGHT value */
+}
+
+
+/** Columns inner
+---------------------------------
+*  You can change the padding inside the columns without changing the
+*  width of them by just usinbg the INNER div of each column
+*/
+
+.inner {
+	padding: 0px;
+}
+
+/** Navigation styles
+---------------------------------
+*  The navigation is loaded after the content, so we need to make space
+*  for it, equal to its height, so if you change the height of the navigation,
+*  remember to adapt the margin top of the content and sidebars.
+*/
+
+#navigation {
+  float: left;
+  margin-left: 0;
+  margin-right: -100%;
+  padding: 0;
+  width: 100%;
+}
+.with-navigation #content,
+.with-navigation .sidebar {
+  margin-top: 5px;        /* Navigation Height */
+}
+#navigation {
+  height: 40px;            /* Navigation Height */
+}
+
+#image-wrapper					{ height: auto; background-color: white; -moz-box-shadow: 0px 0px 5px #333; }                           	
+#image-wrapper .slidingPanelsContent { height:330px; float: left; }
+.SlidingPanels {
+	position: relative;
+	width: 960px;
+	height: 330px;
+	padding: 0px;
+	border: none;
+	float: left;
+}
+
+.SlidingPanelsContentGroup {
+	position: relative;
+	width: 10000px;
+	margin: 0px;
+	float:left;
+	padding: 0px;
+	border: none;
+}
+
+.SlidingPanelsContent {
+	width: 960px;
+	height: 330px;
+	overflow: hidden;
+	margin: 0px;
+	padding: 0px;
+	border: none;
+}
+.SlidingPanelsAnimating * {
+	overflow: hidden !important;
+}

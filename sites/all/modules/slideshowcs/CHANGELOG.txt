@@ -1,0 +1,31 @@
+Slide Show CS 6.x-2.x, 2008-12-25
+---------------------------------
+
+ New Feature: Multiple Slideshow Blocks
+ #351046
+
+Slide Show CS 6.x-1.12, 2008-12-24
+---------------------------------
+
+ #349533 by Dret: Slideshow now works without Clean URLS.
+
+Slide Show CS 6.x-1.11, 2008-12-24
+---------------------------------
+
+ #350456 by Docc: Change the place where the content
+   	of the block is generated. Now the module
+  	loads the pictures inside the block instead
+  	of the init hook, so that nothing is done if
+  	there is no active slideshow cs block.
+
+
+
+Slide Show CS 6.x-1.10, 2008-12-20
+---------------------------------
+
+#349032 by FiNeX: Added random option for pictures.
+
+Slide Show CS 6.x-1.7, 2008-12-14
+---------------------------------
+
+New readme, and cross slide plugin

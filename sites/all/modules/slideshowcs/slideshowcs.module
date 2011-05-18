@@ -1,0 +1,626 @@
+<?php
+// $Id: slideshowcs.module,v 1.1.2.6.2.15 2010/06/06 09:05:07 davebv Exp $
+
+/**
+  * @file 
+  * Slide Show CS, fancy slideshow block
+  *
+  * This block provides a fancy customizable slideshow block.
+  */
+  
+define("MAX_BLOCKS", 20) ;
+
+/**
+  * Display help and module information
+  * @param path which path of the site we're displaying help
+  * @param arg array that holds the current path as would be returned from arg() function
+  * @return help text for the path
+  */
+function slideshowcs_help($path, $arg) {
+  $output = '';
+  switch ($path) {
+    case "admin/help#slideshowcs":
+    $output = '<p>'.  t("Displays a nice slideshow with cool effects using Cross-Slide jQuery plugin.") .'</p>';
+    break;
+  }
+  return $output;
+} // function slideshowcs_help
+
+
+function slideshowcs_install() {
+  $defaultpath = file_directory_path() .'/slideshowcs';
+  file_check_directory($defaultpath, 1); // Check if the directory exist and create it if necessary. 
+}
+
+function slideshowcs_init() {
+  $noblocks = intval(variable_get('NoBlocks', '1')) ;
+  drupal_add_js(array("NoBlocks" => $noblocks), 'setting');
+  
+  
+}
+
+function slideshowcs_perm() {
+  return array('access slideshowcs content', 'administer slideshowcs');
+}
+
+function slideshowcs_block($op = 'list', $delta = 0, $edit = array()) {
+
+  switch ($op) {
+    case 'list':
+      $noblocks = intval(variable_get('NoBlocks','1')) ;
+      if ($noblocks > MAX_BLOCKS) {
+        $noblocks = 1 ;
+      }
+      for ($i = 0; $i < $noblocks; $i++) {
+    
+        $blocks[$i] = array(
+          'info'       => t('Slideshow CS block '.($i+1)),
+          'cache'      => BLOCK_NO_CACHE ,
+        );
+      }
+      return $blocks;
+    case 'configure':
+      $form = array() ;
+      return block_slideshowcs_form($box, $delta);
+      break;
+    case 'save':
+      slideshowcs_my_block_form_save($delta, $edit) ;
+      break;
+    case 'view': default:    
+      $block['subject'] = "";
+      $block['content'] = slideshowcs_contents($delta);
+      return $block;
+      break;
+    }
+}
+
+function block_slideshowcs_form($edit = array(), $delta) {
+    return slideshowcs_my_block_form($delta);
+}
+
+// Theme hook
+function slideshowcs_theme() {
+  return array(
+    'slideshowcs_my_form' => array(
+      'arguments' => $form,
+    ),
+    'slideshowcs' => array(
+      'template' => 'slideshowcs',
+      'arguments' => array(
+        'contenido' => $contenido,
+      ),
+    ),
+  );
+}
+
+// Content Generation
+function slideshowcs_contents($delta) {
+
+  $contenido = slideshowcs_generate($delta) ;
+
+  $contenido = theme('slideshowcs', $contenido) ;
+  return $contenido;
+}
+
+function slideshowcs_generate($delta) {
+  global $base_path;
+  $defaultpath = file_directory_path() .'/slideshowcs';
+  $aux = 'imagesinfolder'. $delta ;
+  $filepaths = variable_get($aux, array()) ;
+  $aux = 'slideshowcs_folderpath_'. $delta ;
+  $filebasepath = $base_path . variable_get($aux, array()) ;
+  $path = drupal_get_path('module', 'slideshowcs');
+
+  if (!empty($filepaths)) {
+    $blockidcss = "slideshowCS-". $delta ;
+    $aux = 'block_height_'. $delta ;
+    $trans = array("!blockid" => $blockidcss, "!blockheight" => variable_get($aux, '200'));
+    
+    $contenido = strtr("<div id='!blockid' style='height:!blockheightpx' class='slideshowCS-content'>", $trans) ;
+    $contenido .= "<div class='slideshowCS-loading-text'>". t('Loading...') ."</div></div>" ;
+    
+    $indice = 0 ;
+    
+    $images = array();
+    
+   foreach ( $filepaths as $valor ) {
+      $indice++ ;
+      $aux = 'fade_time_'. $delta ;
+      $fade = variable_get($aux, '1');
+      // Picture enabled?
+      $auxiliar = 'enabled'. $indice . $delta ;
+      
+      if (variable_get($auxiliar, '1')) {
+
+        $auxiliarfromx = 'fromx'. $indice . $delta ;    
+        $auxiliarfromy = 'fromy'. $indice . $delta ;    
+        $auxiliarfromzoom = 'fromzoom'. $indice . $delta ;
+        $auxiliartox = 'tox'. $indice . $delta ;
+        $auxiliartoy = 'toy'. $indice . $delta ;
+        $auxiliartozoom = 'tozoom'. $indice . $delta ;
+        $auxiliartime = 'time'. $indice . $delta ;
+        $auxiliarlink = 'link'. $indice . $delta ;
+        // $urlpic = file_create_url(
+        //   strtr("!filebase!filename",
+        //     array(
+        //       '!filebase' => $filebasepath,
+        //       '!filename' => '/'. $valor,
+        //     )
+        //   )
+        // ) ;
+        $urlpic =  strtr("!filebase!filename",
+          array(
+            '!filebase' => $filebasepath,
+            '!filename' => '/'. $valor,
+          )
+        ) ;
+
+        $from = array(
+          '!fromx' => variable_get( $auxiliarfromx, '0'),
+          '!fromy'=> variable_get( $auxiliarfromy, '0'),
+          '!fromzoom' => variable_get( $auxiliarfromzoom, '1'),
+        );
+        $to = array(
+          '!tox' => variable_get($auxiliartox, '0'),
+          '!toy' => variable_get($auxiliartoy, '0'),
+          '!tozoom' => variable_get($auxiliartozoom, '1'),
+        );  
+        $images[] = array(
+          'src' => $urlpic,
+          'href' => variable_get($auxiliarlink, '') ,
+          'from' => strtr('!fromx% !fromy% !fromzoomx', $from),
+          'to' => strtr('!tox% !toy% !tozoomx', $to),
+          'time' => variable_get($auxiliartime, '2'),
+        );
+      }
+   }
+    $aux = 'random_load_'. $delta ;
+    if(variable_get($aux, '0')){
+      shuffle($images);
+    }
+
+    // If there is no Pictures in the chosen folder
+  }
+  else {
+    $contenido = "<div id='slideshowCS' style='height:100px'>". t('No images in the configured folder') ."</div>" ;
+  }
+
+  $js_settings = array(
+    'imagesCS' => $images,
+    'fade' => $fade,
+  );
+
+  // Add Style Sheets
+  drupal_add_css($path .'/slideshowcs.css') ;
+
+  // Feature requested to jQuery plugin module: add cross-slide plugin to JQ plugins
+  // if (module_exists('jq')) {jq_add('crossslide');}
+
+  // Until Cross-Slide is added to jQuery plugins:
+  drupal_add_js($path .'/jquery.cross-slide.js', 'module', 'header') ;
+  $aux = 'slideshowcs'. $delta ;
+  drupal_add_js(array($aux => $js_settings), 'setting');
+  //drupal_add_js("var slideshowcsjsvar = ". drupal_to_js($images).";",'inline');
+  drupal_add_js($path .'/slideshowcs.js', 'module', 'header') ;
+  //drupal_add_js($path.'/slideshowcs.js') ;
+
+  return $contenido ;
+}
+
+
+// Admin section
+
+function slideshowcs_menu() {
+
+  $items = array();
+
+  $items['admin/settings/slideshowcs'] = array(
+    'title' => t('Slideshow CS settings'),
+    'page callback' => 'slideshowcs_form',
+    'access arguments' => array('access administration pages'),
+    'description' => t('Configure Slideshow CS'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+
+function slideshowcs_form() {
+  return drupal_get_form('slideshowcs_my_form');
+}
+
+function theme_slideshowcs_my_form(&$form) {
+  // Render the first section  
+  $output = drupal_render($form['title']) ;
+  $output .= drupal_render($form['NoBlocks']) ;
+  $output .= drupal_render($form['Folder']) ;
+
+  // Add the table to be draggable
+  // TODO: save the values to make it work properly 
+  // drupal_add_tabledrag('menu-slideshow', 'order', 'sibling', 'menu-weight');
+
+  $header = array(
+    array('data' => t('File')),
+    array('data' => t('Enable')),
+    array('data' => t('From x %')),
+    array('data' => t('From y %')),
+    array('data' => t('From Zoom .x')),
+    array('data' => t('To x %')),
+    array('data' => t('To y %')),
+    array('data' => t('To Zoom .x')),
+    array('data' => t('Time (s)')),
+    array('data' => t('Link to...')),
+  );
+  $rows = array() ;
+  $row = array() ;
+  $first_level = array() ;
+  //print print_r($form['files'],1) ;
+  foreach (element_children($form['files']) as $key => $value) {
+    // TODO 
+    // $form['files'][$value]['weight']['#attributes']['class'] = 'menu-weight';
+
+    $first_level = array($value) ;
+
+    $second_level = array() ;
+    foreach (element_children($form['files'][$value]) as $key2 => $value2) {
+      $second_level[] = drupal_render($form['files'][$value][$value2]) ;
+    }
+    $row = array_merge($first_level, $second_level, array(drupal_render($form['files'][$value]['weight']))) ;
+    $row = array('data' => $row) ;
+    $row['class'] = !empty($row['class']) ? $row['class'] .' draggable' : 'draggable';
+    $rows[] = $row;
+  }
+
+  if ($rows) {
+    // TODO
+    // $output .= '<div>'. theme('table', $header, $rows, array('id' => 'menu-slideshow')) .'</div>' ;
+    $output .= '<div>'. theme('table', $header, $rows) .'</div>' ;
+  }
+  $output .= drupal_render($form);
+
+  return $output;
+}
+
+
+function slideshowcs_my_form($form_state) {
+  //from: '65% 50% 1x',
+  //to:   '100% 20% 1x',
+  //time: 2
+  $defaultpath = file_directory_path() .'/slideshowcs' ;
+  $form['NoBlocks'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Number of blocks'),
+    '#default_value' => variable_get('NoBlocks', '1'), 
+    '#size' => 3,
+    '#maxlength' => 2,
+    '#description' => t("Number of desired blocks, maximun allowed %maximo.", array('%maximo' => MAX_BLOCKS) ),
+    '#required' => TRUE,
+  ) ;
+
+  $form = system_settings_form($form);
+  $form['#theme'] = 'slideshowcs_my_form';
+  return $form;
+}
+
+function slideshowcs_my_block_form($delta) {
+  //from: '65% 50% 1x',
+  //to:   '100% 20% 1x',
+  //time: 2
+  $defaultpath = file_directory_path() .'/slideshowcs' ;
+
+
+  $form['Folder'] = array(
+    '#type' => 'fieldset', 
+    '#title' => t('Slideshow CS block Settings'), 
+    '#collapsible' => TRUE, 
+    '#collapsed' => FALSE,
+  );
+  $aux = 'slideshowcs_folderpath_'. $delta ;
+  $form['Folder'][$aux] = array(
+    '#type' => 'textfield',
+    '#title' => t('Pictures folder'),
+    '#default_value' => variable_get($aux, $defaultpath), 
+    '#size' => 50,
+    '#maxlength' => 90,
+    '#description' => t("Folder where the images are situated."),
+    '#required' => TRUE,
+  );
+
+  $aux = 'block_height_'. $delta ;
+  $form['Folder'][$aux] = array(
+    '#type' => 'textfield',
+    '#title' => t('Height'),
+    '#default_value' => variable_get($aux, '200'), 
+    '#size' => 4,
+    '#maxlength' => 4,
+    '#description' => t("Block height in pixels."),
+    '#required' => TRUE,
+  );
+  $aux = 'fade_time_'. $delta ;
+  $form['Folder'][$aux] = array(
+    '#type' => 'textfield',
+    '#title' => t('Fade'),
+    '#default_value' => variable_get($aux, '1'), 
+    '#size' => 4,
+    '#maxlength' => 1,
+    '#description' => t("Fade duration in seconds."),
+    '#required' => TRUE,
+  );
+
+  $aux = 'random_load_'. $delta ;
+  $form['Folder'][$aux] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Random slideshow'),
+    '#default_value' => variable_get($aux, '0'),
+    '#description' => t("If checked, loads the slideshow in a random order.")
+  );
+
+
+  // Files section 
+  $form['files'] = array(
+    '#type' => 'hidden', 
+    '#title' => t('Files'), 
+  );
+
+  // See if the directory has images
+  $aux = 'slideshowcs_folderpath_'. $delta ;
+  $contenido1 = file_scan_directory(
+    variable_get($aux, $defaultpath),
+    "jpg$|png$|gif$|JPG$|PNG$|GIF$",
+    array('.', '..', 'CVS'),
+    0, // Callback (0 for no callback).
+    FALSE,
+    'filename',
+    0
+  ) ;
+
+  $filenames = array() ;
+  foreach ($contenido1 as $value) {
+    // Entire path $value->filename
+    // File name with extension $value->basename
+    // File name with no extension "$value->name
+    if (FALSE == image_get_info( $value->filename )) {
+      drupal_set_message(t('The file %name is not an image', array('%name' => $value->basename)), 'warning');
+    }
+    else {
+      $fileimage = $value->basename ;
+      $filenames[] = $fileimage ;	  
+    }
+  }
+
+  sort($filenames);
+  //$aux = 'imagesinfolder'. $delta ;
+  //variable_set($aux, $filenames) ;
+
+  $indice = 0;
+  foreach ($filenames as $key => $value) {
+    $indice++ ;
+
+    $form['files'][$value] = array(
+      '#type' => 'hidden', 
+      '#title' => $value,
+    );
+    $auxiliar = 'enabled'. $indice . $delta ;    
+    $form['files'][$value][$auxiliar] = array(
+      '#type' => 'checkbox', 
+      //'#title' => t($value),
+      '#default_value' => variable_get($auxiliar, '1'),
+      '#weight' => 1 ,
+    );
+    // From
+    $auxiliar = 'fromx'. $indice  . $delta ;    
+    $form['files'][$value][$auxiliar] = array(
+      '#type' => 'textfield',
+      //'#title' => t('Origin x'),
+      '#default_value' => variable_get($auxiliar, '0'),
+      '#size' => 3,
+      '#maxlength' => 3,
+      //'#description' => t("Folder where the images are situated."),
+      '#required' => FALSE,
+      '#weight' => 2 ,
+    );
+    $auxiliar = 'fromy'. $indice . $delta ;    
+    $form['files'][$value][$auxiliar] = array(
+      '#type' => 'textfield',
+      //'#title' => t('y'),
+      '#default_value' => variable_get($auxiliar, '0'), 
+      '#size' => 3,
+      '#maxlength' => 3,
+      //'#description' => t("Folder where the images are situated."),
+      '#required' => FALSE,
+      '#weight' => 3 ,
+    );
+    $auxiliar = 'fromzoom'. $indice . $delta ;
+    $form['files'][$value][$auxiliar] = array(
+      '#type' => 'textfield',
+      //'#title' => t('Zoom'),
+      '#default_value' => variable_get($auxiliar, '1'),
+      '#size' => 3,
+      '#maxlength' => 3,
+      //'#description' => t("Folder where the images are situated."),
+      '#required' => FALSE,
+      '#weight' => 4 ,
+    );
+    // TO
+    $auxiliar = 'tox'. $indice . $delta ;
+    $form['files'][$value][$auxiliar] = array(
+      '#type' => 'textfield',
+      //'#title' => t('To x'),
+      '#default_value' => variable_get($auxiliar, '0'),
+      '#size' => 3,
+      '#maxlength' => 3,
+      //'#description' => t("Folder where the images are situated."),
+      '#required' => FALSE,
+      '#weight' => 5 ,
+    );
+    $auxiliar = 'toy'. $indice . $delta ;
+    $form['files'][$value][$auxiliar] = array(
+      '#type' => 'textfield',
+      //'#title' => t('y'),
+      '#default_value' => variable_get($auxiliar, '0'),
+      '#size' => 3,
+      '#maxlength' => 3,
+      //'#description' => t("Folder where the images are situated."),
+      '#required' => FALSE,
+      '#weight' => 6 ,
+    );
+    $auxiliar = 'tozoom'. $indice . $delta ;
+    $form['files'][$value][$auxiliar] = array(
+      '#type' => 'textfield',
+      //'#title' => t('Zoom2'),
+      '#default_value' => variable_get($auxiliar, '1'),
+      '#size' => 3,
+      '#maxlength' => 4,
+      //'#description' => t("Folder where the images are situated."),
+      '#required' => FALSE,
+      '#weight' => 7 ,
+    );
+    // Duration
+    $auxiliar = 'time'. $indice . $delta ;
+    $form['files'][$value][$auxiliar] = array(
+      '#type' => 'textfield',
+      //'#title' => t('Duration'),
+      '#default_value' => variable_get($auxiliar, '2'),
+      '#size' => 2,
+      '#maxlength' => 2,
+      //'#description' => t("Duration."),
+      '#required' => FALSE,
+      '#weight' => 8 ,
+    );
+    // Link of each image
+    $auxiliar = 'link'. $indice . $delta ;
+    $form['files'][$value][$auxiliar] = array(
+      '#type' => 'textfield',
+      //'#title' => t('Link to...'),
+      '#default_value' => variable_get($auxiliar, ''),
+      '#size' => 30,
+      '#maxlength' => 500,
+      //'#description' => t("Duration."),
+      '#required' => FALSE,
+      '#weight' => 9 ,
+    );
+  }
+
+  //$form = system_settings_form($form);
+  $form['#theme'] = 'slideshowcs_my_form';
+  return $form;
+}
+
+function slideshowcs_my_block_form_save($delta, $edit = array()) {
+  $defaultpath = file_directory_path() . t('/slideshowcs');
+
+
+  $aux = 'slideshowcs_folderpath_'. $delta ;
+  variable_set($aux, $edit[$aux]) ;
+
+  $aux = 'block_height_'. $delta ;
+  variable_set($aux, $edit[$aux]) ;
+
+  $aux = 'fade_time_'. $delta ;
+  variable_set($aux, $edit[$aux]) ;
+
+  $aux = 'random_load_'. $delta ;
+  variable_set($aux, $edit[$aux]) ;
+
+
+  // Files section
+  // See if the directory has images
+  $aux = 'slideshowcs_folderpath_'. $delta ;
+  $contenido1 = file_scan_directory(
+    variable_get($aux, $defaultpath),
+    "jpg$|png$|gif$|JPG$|PNG$|GIF$",
+    array('.', '..', 'CVS'),
+    0, // Callback (0 for no callback).
+    FALSE,
+    'filename',
+    0
+  ) ;
+
+  $filenames = array() ;
+  foreach ($contenido1 as $value) {
+    // Entire path $value->filename
+    // File name with extension $value->basename
+    // File name with no extension "$value->name
+    if (FALSE == image_get_info( $value->filename )) {
+      drupal_set_message(t('The file %name is not an image', array('%name' => $value->basename)), 'warning');
+    }
+    else {
+      $fileimage = $value->basename ;
+      $filenames[] = $fileimage ;	  
+    }
+  }
+
+  sort($filenames);
+  $aux = 'imagesinfolder'. $delta ;
+  variable_set($aux, $filenames) ;
+
+  $indice = 0;
+  foreach ($filenames as $key => $value) {
+    $indice++ ;
+
+    $auxiliar = 'enabled'. $indice . $delta ;    
+    variable_set($auxiliar, $edit[$auxiliar]) ;
+    // From
+    $auxiliar = 'fromx'. $indice  . $delta ;    
+    variable_set($auxiliar, $edit[$auxiliar]) ;
+    $auxiliar = 'fromy'. $indice . $delta ;    
+    variable_set($auxiliar, $edit[$auxiliar]) ;
+    $auxiliar = 'fromzoom'. $indice . $delta ;
+    variable_set($auxiliar, $edit[$auxiliar]) ;
+    // TO
+    $auxiliar = 'tox'. $indice . $delta ;
+    variable_set($auxiliar, $edit[$auxiliar]) ;
+    $auxiliar = 'toy'. $indice . $delta ;
+    variable_set($auxiliar, $edit[$auxiliar]) ;
+    $auxiliar = 'tozoom'. $indice . $delta ;
+    variable_set($auxiliar, $edit[$auxiliar]) ;
+    // Duration
+    $auxiliar = 'time'. $indice . $delta ;
+    variable_set($auxiliar, $edit[$auxiliar]) ;
+    // Link
+    $auxiliar = 'link'. $indice . $delta ;
+    variable_set($auxiliar, check_url($edit[$auxiliar])) ;
+  }
+  return 0;
+}
+
+function slideshowcs_my_form_validate($form, &$form_state) {
+
+  $noblocks = intval($form_state['values']['NoBlocks']) ;
+  if ($noblocks > MAX_BLOCKS) {
+    variable_set('NoBlocks', strval(MAX_BLOCKS)) ;
+    $form_state['values']['NoBlocks'] = MAX_BLOCKS ;
+    drupal_set_message(t('The maximum number of blocks is '. MAX_BLOCKS)) ;
+    return ;
+  }
+  if ($noblocks < 1) {
+    variable_set('NoBlocks', '1') ;
+    $form_state['values']['NoBlocks'] = '1' ;
+    drupal_set_message(t('At least you have to configure one block. Maximum numbef of blocks is '. MAX_BLOCKS .'.')) ;
+    return ;
+  }
+
+}
+
+function slideshowcs_my_form_validate_viejo($form, &$form_state) {
+  $folderpath = $form_state['values']['slideshowcs_folderpath'];
+
+  $directory = rtrim($folderpath, '/\\');
+  $directory = trim($directory, '/\\');
+  variable_set('slideshowcs_folderpath', $directory) ;
+  $form_state['values']['slideshowcs_folderpath'] = $directory ;
+  // Check if directory exists.
+  if (!is_dir($directory)) {
+    $defaultpath = file_directory_path() . t('/slideshowcs');
+    //form_set_error('slideshowcs_folderpath', t('The directory %directory does not exist.', array('%directory' => $directory)));
+    variable_set('slideshowcs_folderpath', $defaultpath) ;
+    $form_state['values']['slideshowcs_folderpath'] = $defaultpath ;
+    drupal_set_message(t('The directory %directory does not exist.', array('%directory' => $directory)), 'error');
+  }
+  $noblocks = intval($form_state['values']['NoBlocks']) ;
+  if ($noblocks > MAX_BLOCKS) {
+    variable_set('NoBlocks', strval(MAX_BLOCKS)) ;
+    $form_state['values']['NoBlocks'] = MAX_BLOCKS ;
+    drupal_set_message(t('The maximum number of blocks is '. MAX_BLOCKS)) ;
+  }
+}

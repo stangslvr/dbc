@@ -1,0 +1,5 @@
+# Ignore configuration files that may contain sensitive information.
+sites/*/settings*.php
+sites/all/modules/devel/
+sites/all/modules/devel_themer/
+sites/default/
