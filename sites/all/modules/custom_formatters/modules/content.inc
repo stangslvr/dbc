@@ -1,5 +1,4 @@
 <?php
-// $Id: content.inc,v 1.1.2.1 2010/02/04 09:33:51 deciphered Exp $
 /**
  * @file
  * Provides Custom Formatters integration with the CCK module.

@@ -1,5 +1,4 @@
 <?php
-// $Id: custom_formatters.admin.inc,v 1.2.2.10 2010/03/02 06:34:31 deciphered Exp $
 /**
  * @file
  * Contains administration functions for the Custom Formatters module.
@@ -10,6 +9,9 @@ function custom_formatters_overview($form_state) {
     switch ($form_state['values']['operation']) {
       case 'delete':
         return custom_formatters_bulk_delete_confirm($form_state, array_filter($form_state['values']['formatters']));
+
+      case 'convert':
+        return custom_formatters_bulk_convert_confirm($form_state, array_filter($form_state['values']['formatters']));
 
       case 'export':
         drupal_set_title(t('Bulk export'));
@@ -27,6 +29,7 @@ function custom_formatters_overview($form_state) {
     '#type' => 'select',
     '#options' => array(
       'export' => t('Export'),
+      'convert' => t('Convert'),
       'delete' => t('Delete'),
     ),
     '#default_value' => 'approve',
@@ -40,19 +43,24 @@ function custom_formatters_overview($form_state) {
   $destination = drupal_get_destination();
   $formatters = array();
   foreach (custom_formatters_formatters(FALSE, 25) as $formatter) {
-    $formatters[$formatter->cfid] = '';
-    $form['label'][$formatter->cfid] = array('#value' => l($formatter->label, 'admin/settings/formatters/edit/' . $formatter->cfid, array('query' => $destination)));
-    $form['fields'][$formatter->cfid] = array('#value' => implode(', ', unserialize($formatter->field_types)));
-    $operations = array(
-      l(t('Edit'), 'admin/settings/formatters/edit/' . $formatter->cfid, array('query' => $destination)),
-      l(t('Delete'), 'admin/settings/formatters/delete/' . $formatter->cfid, array('query' => $destination)),
-      l(t('Clone'), 'admin/settings/formatters/clone/' . $formatter->cfid, array('query' => $destination)),
-    );
-    // Export can only be done for 'advanced' formatters.
-    if ($formatter->mode == 'advanced') {
-      $operations[] = l(t('Export'), 'admin/settings/formatters/export/' . $formatter->cfid, array('query' => $destination));
+    $operations = array();
+    if ($formatter->status) {
+      $operations[] = l(t('Edit'), 'admin/build/formatters/edit/' . $formatter->name, array('query' => $destination));
+      $operations[] = $formatter->source == 'module' ? t('Revert') : l(isset($formatter->override) ? t('Revert') : t('Delete'), 'admin/build/formatters/delete/' . $formatter->name, array('query' => $destination));
+      $operations[] = l(t('Clone'), 'admin/build/formatters/clone/' . $formatter->name, array('query' => $destination));
+      $operations[] = l(t('Export'), 'admin/build/formatters/export/' . $formatter->name, array('query' => $destination));
+      $operations[] = $formatter->mode == 'basic' ? l(t('Convert'), 'admin/build/formatters/convert/' . $formatter->name, array('query' => $destination)) : t('Convert');
+      $operations[] = l(t('Disable'), 'admin/build/formatters/status/' . $formatter->name, array('query' => $destination));
     }
-    $form['operations'][$formatter->cfid] = array('#value' => implode('&nbsp;&nbsp;&nbsp;&nbsp;', $operations));
+    else {
+      $operations[] = l(t('Enable'), 'admin/build/formatters/status/' . $formatter->name, array('query' => $destination));
+    }
+
+    $formatters[$formatter->name] = '';
+    $form['label'][$formatter->name] = array('#value' => l($formatter->label, 'admin/build/formatters/edit/' . $formatter->name, array('query' => $destination)));
+    $form['mode'][$formatter->name] = array('#value' => $formatter->mode);
+    $form['fields'][$formatter->name] = array('#value' => implode(', ', unserialize($formatter->field_types)));
+    $form['operations'][$formatter->name] = array('#value' => implode('&nbsp;&nbsp;&nbsp;&nbsp;', $operations));
   }
 
   $form['formatters'] = array('#type' => 'checkboxes', '#options' => $formatters);
@@ -69,7 +77,7 @@ function theme_custom_formatters_overview($form) {
 
   $empty = !(isset($form['label']) && is_array($form['label']));
   $select_header = !$empty ? theme('table_select_header_cell') : '';
-  $header = array($select_header, t('Label'), t('Field types'), t('Operations'));
+  $header = array($select_header, t('Label'), t('Mode'), t('Field types'), t('Operations'));
   $rows = array();
 
   $output .= drupal_render($form['options']);
@@ -78,6 +86,7 @@ function theme_custom_formatters_overview($form) {
       $row = array();
       $row[] = drupal_render($form['formatters'][$key]);
       $row[] = drupal_render($form['label'][$key]);
+      $row[] = drupal_render($form['mode'][$key]);
       $row[] = drupal_render($form['fields'][$key]);
       $row[] = drupal_render($form['operations'][$key]);
       $rows[] = $row;
@@ -101,50 +110,6 @@ function custom_formatters_bulk_submit($form, &$form_state) {
   $form_state['rebuild'] = TRUE;
 }
 
-function custom_formatters_bulk_delete_confirm(&$form_state, $formatters) {
-  $form = array();
-  $form['formatters'] = array(
-    '#prefix' => '<ul>',
-    '#suffix' => '</ul>',
-    '#tree' => TRUE
-  );
-
-  foreach ($formatters as $cfid) {
-    $name = db_result(db_query('SELECT name FROM {formatters} WHERE cfid = %d', $cfid));
-    $form['formatters'][$cfid] = array(
-      '#type' => 'hidden',
-      '#value' => $cfid,
-      '#prefix' => '<li>',
-      '#suffix' => check_plain($name) . "</li>\n",
-    );
-  }
-
-  $form['operation'] = array(
-    '#type' => 'hidden',
-    '#value' => 'delete'
-  );
-  $form['#submit'][] = 'custom_formatters_bulk_delete_confirm_submit';
-
-  return confirm_form(
-    $form,
-    t('Are you sure you want to delete these items?'),
-    'admin/settings/formatters', t('This action cannot be undone.'),
-    t('Delete all'), t('Cancel')
-  );
-}
-
-function custom_formatters_bulk_delete_confirm_submit($form, &$form_state) {
-  if ($form_state['values']['confirm']) {
-    foreach ($form_state['values']['formatters'] as $cfid) {
-      db_query("DELETE FROM {formatters} WHERE cfid = %d", $cfid);
-    }
-    custom_formatters_clear_cache();
-    drupal_set_message(t('The items have been deleted.'));
-  }
-  $form_state['redirect'] = 'admin/settings/formatters';
-  return;
-}
-
 function custom_formatters_formatter_form($form_state, $formatter = NULL, $op = 'add') {
   $form = array();
 
@@ -152,9 +117,13 @@ function custom_formatters_formatter_form($form_state, $formatter = NULL, $op = 
     drupal_set_message(t('Be sure to change the formatter %name when cloning.', array('%name' => 'Name')), 'warning');
   }
 
-  $form['cfid'] = array(
+  $form['new'] = array(
     '#type' => 'value',
-    '#value' => ($op == 'edit') ? $formatter->cfid : NULL,
+    '#value' => (empty($formatter) || $op == 'clone'),
+  );
+  $form['old'] = array(
+    '#type' => 'value',
+    '#value' => !empty($formatter) ? $formatter->name : NULL,
   );
 
   $form['basic'] = array(
@@ -163,15 +132,21 @@ function custom_formatters_formatter_form($form_state, $formatter = NULL, $op = 
   );
   $form['basic']['name'] = array(
     '#type' => 'textfield',
-    '#size' => '32',
+    '#size' => '64',
+    '#maxlength' => '64',
     '#title' => t('Name'),
     '#default_value' => !is_null($formatter) ? $formatter->name : '',
     '#description' => t('For internal use, must be unique and only use alphanumeric characters and underscores (_).'),
     '#required' => TRUE,
+    '#disabled' => (isset($formatter) && ($op !== 'clone' && (isset($formatter->override) || $formatter->source == 'database'))),
   );
+  if (isset($formatter) && ($op !== 'clone' && (isset($formatter->override) || $formatter->source == 'database'))) {
+    $form['basic']['name']['#value'] = $form['basic']['name']['#default_value'];
+  }
   $form['basic']['label'] = array(
     '#type' => 'textfield',
-    '#size' => '32',
+    '#size' => '64',
+    '#maxlength' => '64',
     '#title' => t('Label'),
     '#default_value' => !is_null($formatter) ? $formatter->label : '',
     '#description' => t('Human readable name, displayed on Custom Formatters overview page and when selecting your CCK Formatter (prefixed with "!custom").', array('!custom' => t('Custom:'))),
@@ -229,7 +204,7 @@ function custom_formatters_formatter_form($form_state, $formatter = NULL, $op = 
         '#collapsible' => TRUE,
       );
       $form['preview']['node'] = array(
-        '#type' => 'radios',
+        '#type' => 'select',
         '#title' => t('Preview node type'),
         '#options' => devel_generate_content_types(),
         '#default_value' => array_shift(array_keys(devel_generate_content_types())),
@@ -253,6 +228,12 @@ function custom_formatters_formatter_form($form_state, $formatter = NULL, $op = 
       '#type' => 'submit',
       '#value' => t('Save'),
       '#submit' => array('custom_formatters_formatter_form_save'),
+    );
+
+    $form['buttons']['edit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Save & Edit'),
+      '#submit' => array('custom_formatters_formatter_form_save_edit'),
     );
 
     if ($op == 'edit') {
@@ -350,8 +331,8 @@ function custom_formatters_formatter_form_validate($form, &$form_state) {
   }
 
   // Make sure formatter name isn't already in use by another formatter.
-  $formatter = custom_formatters_formatter_by_name($form_state['values']['name']);
-  if (!empty($formatter) && $formatter->cfid !== $form_state['values']['cfid']) {
+  $formatter = custom_formatters_formatter($form_state['values']['name']);
+  if (!empty($formatter) && ($form_state['values']['new'] == TRUE || $form_state['values']['old'] !== $formatter->name)) {
     form_error($form['basic']['name'], t('A formatter with the name %name already exists.', array('%name' => $form_state['values']['name'])));
   }
 }
@@ -366,83 +347,137 @@ function custom_formatters_formatter_form_save($form, &$form_state) {
   $form_state['values']['field_types'] = explode(', ', $form_state['values']['field_types']);
 
   // Create new formatter.
-  if (!$form_state['values']['cfid']) {
-    drupal_write_record('formatters', $form_state['values']);
+  if ($form_state['values']['new']) {
     drupal_set_message(t('Formatter %name was added.', array('%name' => $form_state['values']['name'])));
   }
 
   // Update existing formatter.
   else {
-    drupal_write_record('formatters', $form_state['values'], 'cfid');
-    drupal_set_message(t('Formatter %name (ID: @id) was updated.', array('%name' => $form_state['values']['name'], '@id' => $form_state['values']['cfid'])));
+    db_query("DELETE FROM {formatters} WHERE name = '%s'", $form_state['values']['old']);
+    drupal_set_message(t('Formatter %name was updated.', array('%name' => $form_state['values']['name'])));
   }
 
+  // Write formatter to database.
+  drupal_write_record('formatters', $form_state['values']);
+
   custom_formatters_clear_cache();
-  $form_state['redirect'] = 'admin/settings/formatters';
   unset($form_state['storage']);
+
+  $_REQUEST['destination'] = empty($_REQUEST['destination']) ? 'admin/build/formatters' : $_REQUEST['destination'];
+}
+
+function custom_formatters_formatter_form_save_edit($form, &$form_state) {
+  custom_formatters_formatter_form_save($form, $form_state);
+  $_REQUEST['destination'] = 'admin/build/formatters/edit/' . $form_state['values']['name'] . '?destination=' . $_REQUEST['destination'];
 }
 
 function custom_formatters_formatter_form_delete($form, &$form_state) {
-  drupal_goto('admin/settings/formatters/delete/' . $form_state['values']['cfid']);
+  $_REQUEST['destination'] = 'admin/build/formatters/delete/' . $form_state['values']['name'] . '?destination=' . $_REQUEST['destination'];
 }
 
 function custom_formatters_formatter_delete_form($form_state, $formatter = array()) {
   if (empty($formatter)) {
     drupal_set_message(t('The specified formatter was not found'), 'error');
-    drupal_goto('admin/settings/formatters');
+    drupal_goto('admin/build/formatters');
   }
 
   $form = array();
 
-  $form['cfid'] = array(
+  $form['name'] = array(
     '#type' => 'value',
-    '#value' => $formatter->cfid
+    '#value' => $formatter->name
   );
 
   return confirm_form(
     $form,
-    t('Are you sure you want to delete the formatter %name?', array('%name' => $formatter->name)),
-    'admin/settings/formatters',
+    t('Are you sure you want to !delete the formatter %name?', array('%name' => $formatter->name, '!delete' => isset($formatter->override) ? t('revert') : t('delete'))),
+    'admin/build/formatters',
     t('This action cannot be undone.'),
-    t('Delete'),
+    t('!delete', array('!delete' => isset($formatter->override) ? t('Revert') : t('Delete'))),
     t('Cancel')
   );
 }
 
 function custom_formatters_formatter_delete_form_submit($form, &$form_state) {
-  $formatter = custom_formatters_formatter($form_state['values']['cfid']);
+  $formatter = custom_formatters_formatter($form_state['values']['name']);
 
-  db_query("DELETE FROM {formatters} WHERE cfid = %d", $form_state['values']['cfid']);
+  db_query("DELETE FROM {formatters} WHERE name = '%s'", $form_state['values']['name']);
   custom_formatters_clear_cache();
 
-  drupal_set_message(t('Formatter %name (ID: @id) was deleted.', array('%name' => $formatter->name, '@id' => $formatter->cfid)));
-  $form_state['redirect'] = 'admin/settings/formatters';
+  drupal_set_message(t('Formatter %name was deleted.', array('%name' => $formatter->name)));
+  $form_state['redirect'] = 'admin/build/formatters';
+}
+
+function custom_formatters_bulk_delete_confirm(&$form_state, $formatters) {
+  $form = array();
+  $form['formatters'] = array(
+    '#prefix' => '<ul>',
+    '#suffix' => '</ul>',
+    '#tree' => TRUE
+  );
+
+  foreach ($formatters as $name) {
+    $formatter = custom_formatters_formatter($name);
+    $form['formatters'][$name] = array(
+      '#type' => 'hidden',
+      '#value' => $name,
+      '#prefix' => '<li>',
+      '#suffix' => check_plain($formatter->label) . ' <em>(' . check_plain($formatter->name) . ")</em></li>\n",
+    );
+  }
+
+  $form['operation'] = array(
+    '#type' => 'hidden',
+    '#value' => 'delete'
+  );
+  $form['#submit'][] = 'custom_formatters_bulk_delete_confirm_submit';
+
+  return confirm_form(
+    $form,
+    t('Are you sure you want to delete these items?'),
+    'admin/build/formatters', t('This action cannot be undone.'),
+    t('Delete all'), t('Cancel')
+  );
+}
+
+function custom_formatters_bulk_delete_confirm_submit($form, &$form_state) {
+  if ($form_state['values']['confirm']) {
+    foreach ($form_state['values']['formatters'] as $name) {
+      db_query("DELETE FROM {formatters} WHERE name = '%s'", $name);
+    }
+    custom_formatters_clear_cache();
+    drupal_set_message(t('The items have been deleted.'));
+  }
+  $form_state['redirect'] = 'admin/build/formatters';
+  return;
 }
 
 function custom_formatters_formatter_export_form($form_state, $formatters = array()) {
   if (empty($formatters)) {
     drupal_set_message(t('The specified formatter was not found'), 'error');
-    drupal_goto('admin/settings/formatters');
+    drupal_goto('admin/build/formatters');
   }
 
-  $form = array();
+  $form = array('#tree' => TRUE);
   if (is_array($formatters)) {
     $form['operation'] = array('#type' => 'hidden', '#value' => 'export');
     $form['formatters']['#tree'] = TRUE;
     foreach ($formatters as $formatter) {
       $formatters[$formatter] = custom_formatters_formatter($formatter);
-      if ($formatters[$formatter]->mode == 'basic') {
-        unset($formatters[$formatter]);
-        drupal_set_message(t('Only advanced formatters can be exported.'), 'warning', FALSE);
-      }
-      else {
-        $form['formatters'][$formatter] = array('#type' => 'hidden', '#value' => $formatter);
-      }
+      $form['formatters'][$formatter] = array('#type' => 'hidden', '#value' => $formatter);
     }
     $form['#submit'][] = 'custom_formatters_formatter_export_form_submit';
   }
   else {
-    $formatters = array($formatters->cfid => $formatters);
+    $formatters = array($formatters->name => $formatters);
+  }
+
+  // Cleanup formatters array.
+  foreach ($formatters as &$formatter) {
+    unset($formatter->source);
+    if (isset($formatter->override)) {
+      unset($formatter->override);
+    }
   }
 
   $form['extra'] = array(
@@ -453,24 +488,304 @@ function custom_formatters_formatter_export_form($form_state, $formatters = arra
     '#title' => t('Module name'),
     '#default_value' => !empty($form_state['storage']) ? $form_state['storage']['module'] : 'mymodule',
   );
+  $form['extra']['mode'] = array(
+    '#type' => 'select',
+    '#title' => t('Export mode'),
+    '#options' => array(
+      'standard' => t('Standard CCK formatters'),
+      'custom' => t('Custom formatters')
+    ),
+    '#default_value' => !empty($form_state['storage']) ? $form_state['storage']['mode'] : 'standard',
+    '#description' =>
+      '<strong>' . t('Standard CCK formatters') . ':</strong> ' . t('Uses the standard CCK formatters API (hook_theme(), hook_field_formatter_info(), etc) for a pure code export.') . '<br /><br />' .
+      '<strong>' . t('Custom formatters') . ':</strong> ' . t('Uses a custom format (hook_custom_formatters_default()) to provide more control, in a similar fashion to Views.'),
+  );
   $form['extra']['submit'] = array(
     '#type' => 'submit',
     '#value' => 'Update',
   );
-  $export = theme('custom_formatters_export', $formatters, $form['extra']['module']['#default_value']);
+
+  $filename = drupal_strtolower(str_replace(' ', '_', $form['extra']['module']['#default_value']));
   $form['export']['output'] = array(
-    '#type' => 'textarea',
+    '#type' => 'fieldset',
     '#title' => t('Export'),
-    '#value' => $export,
-    '#rows' => count(split("\n", $export)),
+    '#description' => t('Download !file.', array('!file' => l($filename . (function_exists('gzencode') ? '.tgz' : '.tar'), 'admin/build/formatters/download/' . $form['extra']['mode']['#default_value'] . '/' . $filename . (function_exists('gzencode') ? '.tgz' : '.tar') . '?' . implode(',', array_keys($formatters))))),
+  );
+  $info = theme('custom_formatters_export_info', $formatters, $form['extra']['module']['#default_value']);
+  $form['export']['output']['info'] = array(
+    '#type' => 'textarea',
+    '#title' => $filename . '.info',
+    '#value' => $info,
+    '#rows' => count(split("\n", $info)),
+  );
+  $module = theme("custom_formatters_export_module", $formatters, $form['extra']['module']['#default_value'], $form['extra']['mode']['#default_value']);
+  $form['export']['output']['module'] = array(
+    '#type' => 'textarea',
+    '#title' => $filename . '.module',
+    '#value' => $module,
+    '#rows' => count(split("\n", $module)),
   );
 
   return $form;
 }
 
 function custom_formatters_formatter_export_form_submit($form, &$form_state) {
-  $form_state['storage']['module'] = $form_state['values']['module'];
-  $formatters = $form_state['values']['formatters'];
+  $form_state['storage']['module'] = $form_state['values']['extra']['module'];
+  $form_state['storage']['mode'] = $form_state['values']['extra']['mode'];
+  $formatters = isset($form_state['values']['formatters']) ? $form_state['values']['formatters'] : NULL;
+}
+
+/**
+ * Export var function -- from Views.
+ */
+function custom_formatters_var_export($var, $prefix = '', $init = TRUE) {
+  if (is_object($var)) {
+    $output = method_exists($var, 'export') ? $var->export() : custom_formatters_var_export((array) $var);
+  }
+  elseif (is_array($var)) {
+    if (empty($var)) {
+      $output = 'array()';
+    }
+    else {
+      $output = "array(\n";
+      foreach ($var as $key => $value) {
+        $output .= "  '$key' => " . custom_formatters_var_export($value, '  ', FALSE) . ",\n";
+      }
+      $output .= ')';
+    }
+  }
+  elseif (is_bool($var)) {
+    $output = $var ? 'TRUE' : 'FALSE';
+  }
+  elseif (is_string($var) && strpos($var, "\n") !== FALSE) {
+    // Replace line breaks in strings with a token for replacement
+    // at the very end. This protects whitespace in strings from
+    // unintentional indentation.
+    $var = str_replace("\n", "***BREAK***", $var);
+    $output = var_export($var, TRUE);
+  }
+  else {
+    $output = var_export($var, TRUE);
+  }
+
+  if ($prefix) {
+    $output = str_replace("\n", "\n$prefix", $output);
+  }
+
+  if ($init) {
+    $output = str_replace("***BREAK***", "\n", $output);
+  }
+
+  return $output;
+}
+
+function custom_formatters_formatter_export_tar() {
+  $args = explode('?', arg(5));
+  $file = explode('.', $args[0]);
+
+  $formatters = array();
+  foreach (explode(',', $args[1]) as $name) {
+    $formatters[$name] = custom_formatters_formatter($name);
+  }
+
+  $tar = array(
+    "{$file[0]}/{$file[0]}.info" => theme('custom_formatters_export_info', $formatters, $file[0]),
+    "{$file[0]}/{$file[0]}.module" => theme('custom_formatters_export_module', $formatters, $file[0], arg(4))
+  );
+  $tar = _custom_formatters_tar_create($tar);
+
+  // Clear out output buffer to remove any garbage from tar output.
+  if (ob_get_level()) {
+    ob_end_clean();
+  }
+
+  $header = function_exists('gzencode') ? 'Content-type: application/x-gzip' : 'Content-type: application/x-tar';
+  drupal_set_header($header);
+  drupal_set_header('Content-Disposition: attachment; filename="'. $args[0] .'"');
+  print $tar;
+  exit;
+}
+
+/**
+ * Tar creation function. Written by dmitrig01. Taken from the Features module.
+ *
+ * @param $files
+ *   A keyed array where the key is the filepath and the value is the
+ *   string contents of the file.
+ *
+ * @return
+ *   A string of the tar file contents.
+ */
+function _custom_formatters_tar_create($files) {
+  $tar = '';
+  foreach ($files as $name => $contents) {
+    $binary_data_first = pack("a100a8a8a8a12A12",
+      $name,
+      '100644 ', // File permissions
+      '   765 ', // UID,
+      '   765 ', // GID,
+      sprintf("%11s ", decoct(strlen($contents))), // Filesize,
+      sprintf("%11s", decoct(time())) // Creation time
+    );
+    $binary_data_last = pack("a1a100a6a2a32a32a8a8a155a12", '', '', '', '', '', '', '', '', '', '');
+
+    $checksum = 0;
+    for ($i = 0; $i < 148; $i++) {
+      $checksum += ord(substr($binary_data_first, $i, 1));
+    }
+    for ($i = 148; $i < 156; $i++) {
+      $checksum += ord(' ');
+    }
+    for ($i = 156, $j = 0; $i < 512; $i++, $j++) {
+      $checksum += ord(substr($binary_data_last, $j, 1));
+    }
+
+    $tar .= $binary_data_first;
+    $tar .= pack("a8", sprintf("%6s ", decoct($checksum)));
+    $tar .= $binary_data_last;
+
+    $buffer = str_split($contents, 512);
+    foreach ($buffer as $item) {
+      $tar .= pack("a512", $item);
+    }
+  }
+  if (function_exists('gzencode')) {
+    $tar = gzencode($tar);
+  }
+  return $tar;
+}
+
+function custom_formatters_formatter_convert_form($form_state, $formatter = array()) {
+  if (empty($formatter)) {
+    drupal_set_message(t('The specified formatter was not found'), 'error');
+    drupal_goto('admin/build/formatters');
+  }
+
+  $form = array();
+
+  $form['name'] = array(
+    '#type' => 'value',
+    '#value' => $formatter->name
+  );
+
+  return confirm_form(
+    $form,
+    t('Are you sure you want to convert the formatter %name?', array('%name' => $formatter->name)),
+    'admin/build/formatters',
+    t('This action cannot be undone.'),
+    t('Convert'),
+    t('Cancel')
+  );
+}
+
+function custom_formatters_formatter_convert_form_submit($form, &$form_state) {
+  $formatter = _custom_formatter_convert($form_state['values']['name']);
+
+  drupal_set_message(t('Formatter %name was converted.', array('%name' => $formatter->name)));
+  custom_formatters_clear_cache();
+
+  $form_state['redirect'] = 'admin/build/formatters';
+}
+
+function custom_formatters_bulk_convert_confirm(&$form_state, $formatters) {
+  $form = array();
+  $form['formatters'] = array(
+    '#prefix' => '<ul>',
+    '#suffix' => '</ul><p><strong>' . t('Note') . ':</strong> ' . t("Only 'basic' formatters will be converted.") . '</p>',
+    '#tree' => TRUE
+  );
+
+  foreach ($formatters as $name) {
+    $formatter = custom_formatters_formatter($name);
+    if ($formatter->mode == 'basic') {
+      $form['formatters'][$name] = array(
+        '#type' => 'hidden',
+        '#value' => $name,
+        '#prefix' => '<li>',
+        '#suffix' => check_plain($formatter->label) . ' <em>(' . check_plain($formatter->name) . ")</em></li>\n",
+      );
+    }
+  }
+
+  $form['operation'] = array(
+    '#type' => 'hidden',
+    '#value' => 'convert'
+  );
+  $form['#submit'][] = 'custom_formatters_bulk_convert_confirm_submit';
+
+  return confirm_form(
+    $form,
+    t('Are you sure you want to convert these items?'),
+    'admin/build/formatters', t('This action cannot be undone.'),
+    t('Convert all'), t('Cancel')
+  );
+}
+
+function custom_formatters_bulk_convert_confirm_submit($form, &$form_state) {
+  if ($form_state['values']['confirm']) {
+    foreach ($form_state['values']['formatters'] as $name) {
+      $formatter = _custom_formatter_convert($name);
+    }
+    custom_formatters_clear_cache();
+    drupal_set_message(t('The items have been converted.'));
+  }
+  $form_state['redirect'] = 'admin/build/formatters';
+  return;
+}
+
+function _custom_formatter_convert($name) {
+  $formatter = custom_formatters_formatter($name);
+
+  // Prepare formatter for conversion.
+  $formatter->field_types = unserialize($formatter->field_types);
+  $formatter->mode = 'advanced';
+
+  // Convert formatter code to advanced formatter code.
+  $formatter->code = theme('custom_formatters_convert', $formatter->code);
+
+  // Save formatter.
+  drupal_write_record('formatters', $formatter, 'name');
+
+  return $formatter;
+}
+
+function custom_formatters_formatter_status_form($form_state, $formatter = array()) {
+  if (empty($formatter)) {
+    drupal_set_message(t('The specified formatter was not found'), 'error');
+    drupal_goto('admin/build/formatters');
+  }
+
+  $form = array();
+
+  $form['name'] = array(
+    '#type' => 'value',
+    '#value' => $formatter->name
+  );
+
+  return confirm_form(
+    $form,
+    t('Are you sure you want to !status the formatter %name?', array('%name' => $formatter->name, '!status' => $formatter->status ? t('disable') : t('enable'))),
+    'admin/build/formatters',
+    $formatter->status ? t('If this formatter is in use it could cause issues.') : '',
+    t('!status', array('!status' => $formatter->status ? t('Disable') : t('Enable'))),
+    t('Cancel')
+  );
+}
+
+function custom_formatters_formatter_status_form_submit($form, &$form_state) {
+  $formatter = custom_formatters_formatter($form_state['values']['name']);
+
+  // Prepare formatter for conversion.
+  $formatter->field_types = unserialize($formatter->field_types);
+  $formatter->status = $formatter->status ? 0 : 1;
+
+  db_query("DELETE FROM {formatters} WHERE name = '%s'", $formatter->name);
+  drupal_write_record('formatters', $formatter);
+
+  custom_formatters_clear_cache();
+
+  drupal_set_message(t('Formatter %name was !status.', array('%name' => $formatter->name, '!status' => ($formatter->status ? t('enabled') : t('disabled')))));
+  $form_state['redirect'] = 'admin/build/formatters';
 }
 
 function custom_formatters_token_help() {
@@ -573,7 +888,7 @@ function theme_custom_formatters_preview($formatter) {
   // Give modules a change to alter fields.
   drupal_alter('custom_formatters_fields', $fields);
 
-  if (isset($formatter)) {
+  if (isset($formatter) && !empty($formatter)) {
     foreach (unserialize($formatter->field_types) as $field_type) {
       if (isset($fields[$field_type])) {
         $module = $fields[$field_type]['module'];
@@ -656,12 +971,35 @@ function theme_custom_formatters_preview($formatter) {
   return $output;
 }
 
-function custom_formatters_preprocess_content_field(&$variables) {
-  if (isset($variables['element']['#custom_formatters'])) {
-    $variables['field_type_css'] = 'custom_formatter-preview';
-    $variables['field_name_css'] = 'custom_formatter-preview';
-    $variables['label'] = $variables['element']['#title'];
-    $variables['label_display'] = 'above';
+function custom_formatters_preprocess_content_field(&$vars) {
+  if (isset($vars['element']['#custom_formatters'])) {
+    $vars['field_type_css'] = 'custom_formatter-preview';
+    $vars['field_name_css'] = 'custom_formatter-preview';
+    $vars['label'] = $vars['element']['#title'];
+    $vars['label_display'] = 'above';
+  }
+}
+
+function custom_formatters_preprocess_custom_formatters_export_info(&$vars) {
+  $vars['basic'] = FALSE;
+  foreach ($vars['formatters'] as &$formatter) {
+    if ($formatter->mode == 'basic' || strstr($formatter->code, '_custom_formatters_token_replace')) {
+      $vars['basic'] = TRUE;
+    }
+  }
+}
+
+function custom_formatters_preprocess_custom_formatters_export_module(&$vars) {
+  $vars['basic'] = FALSE;
+  foreach ($vars['formatters'] as &$formatter) {
+    if ($formatter->mode == 'basic' && !isset($formatter->converted) && $vars['mode'] == 'standard') {
+      $formatter->code = theme('custom_formatters_convert', $formatter->code);
+      $formatter->converted = TRUE;
+      $vars['basic'] = TRUE;
+    }
+    elseif (strstr($formatter->code, '_custom_formatters_token_replace')) {
+      $vars['basic'] = TRUE;
+    }
   }
 }
 

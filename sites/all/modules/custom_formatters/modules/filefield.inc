@@ -1,5 +1,4 @@
 <?php
-// $Id: filefield.inc,v 1.1.2.2 2010/01/19 05:47:19 deciphered Exp $
 /**
  * @file
  * Provides Custom Formatters integration with the FileField module.

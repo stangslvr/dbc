@@ -1,4 +1,3 @@
-// $Id: README.txt,v 1.2.2.6 2010/03/02 06:34:31 deciphered Exp $
 
 The Custom Formatters module allows users to easily create custom CCK Formatters
 without the need to write a custom module.
@@ -15,12 +14,15 @@ Features
   * Advanced: A PHP based editor with support for multiple fields and multiple
     values.
 * Support for:
-  * Content Construction Kit (CCK)
-  * Views
-  * Display
+  * CCK fields.
+  * CCK Fieldgroups.
+  * CCK 3.x Multigroups.
+  * Display Suite fields.
+  * Views.
 * Preview custom formatters during creation (requires Devel generate module).
 * Clone an existing custom formatter.
-* Export custom formatters (advanced formatters only).
+* Convert 'basic' formattes to 'advanced' formatters.
+* Export custom formatters (including tar/tgz archive).
 * Support for the Insert module.
 
 
@@ -42,7 +44,7 @@ Usage
 
 Custom Formatters can be managed on the 'Custom Formatters'
 overview page: 'Administer > Site configuration > Custom Formatters'.
-http://[www.yoursite.com/path/to/drupal]/admin/settings/formatters
+http://[www.yoursite.com/path/to/drupal]/admin/build/formatters
 
 More information on usage, including tips & tricks, can be found in help:
 http://[www.yoursite.com/path/to/drupal]/admin/help/custom_formatters

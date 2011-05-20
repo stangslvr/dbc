@@ -1,4 +1,3 @@
-; $Id: custom_formatters.info,v 1.2.2.2 2010/01/15 06:05:39 deciphered Exp $
 name = Custom Formatters
 description = Allows users to easily define custom CCK Formatters.
 dependencies[] = content
@@ -6,9 +5,9 @@ dependencies[] = token
 package = CCK
 core = 6.x
 
-; Information added by drupal.org packaging script on 2010-03-02
-version = "6.x-1.4"
+; Information added by drupal.org packaging script on 2011-04-13
+version = "6.x-1.5"
 core = "6.x"
 project = "custom_formatters"
-datestamp = "1267512004"
+datestamp = "1302697917"
 

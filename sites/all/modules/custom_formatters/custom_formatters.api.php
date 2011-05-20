@@ -1,5 +1,4 @@
 <?php
-// $Id: custom_formatters.api.php,v 1.1.2.1 2010/02/01 07:46:38 deciphered Exp $
 /**
  * @file
  * Hooks provided by the Custom Formatters module.
@@ -33,5 +32,26 @@ function hook_custom_formatters_field_tokens() {
   return array(
     'filefield_paths',
     'file_aliases',
+  );
+}
+
+/**
+ * Provide your own default Custom Formatters.
+ *
+ * @return
+ *   An array containing Custom Formatters settings.
+ */
+function hook_custom_formatters_defaults() {
+  return array(
+    'image' => array(
+      'name' => 'image',
+      'label' => 'Image',
+      'field_types' => 'a:1:{i:0;s:9:"filefield";}',
+      'multiple' => '0',
+      'description' => '',
+      'mode' => 'basic',
+      'code' => '<img src="[site-url]/[filefield-filepath]" alt="" />',
+      'status' => 1,
+    ),
   );
 }
