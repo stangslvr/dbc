@@ -33,7 +33,7 @@ a:hover, a:active {
 }
 
 #content a:link, #content a:visited {
-  color: ffffff;
+  color: #ffffff;
   text-decoration: none;
 }
 
@@ -249,7 +249,7 @@ div.status {
 .car{
     left: -37px;
     position: relative;
-    top: -205px;
+    top: -225px;
 }
 
 .quotes{
@@ -624,6 +624,15 @@ ul.primary {
 	margin-right:30px;
 	padding:12px;
 }
+#content .node-type-news .news_read_more a{
+	color:red;
+}
+#content .news_read_more a{
+	color:red;
+}
+.news, .page_content{
+	font-size:14px;
+}
 .news_date{
 	font-size: 10px;
     font-style: italic;
@@ -727,4 +736,8 @@ ul.primary {
 }
 .front .view-Photos .views-field-title {
 
+}
+#footer a{
+	color:white;
+	font-size:9px;
 }

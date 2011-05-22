@@ -154,7 +154,7 @@
       <?php endif; ?>
 	  
 	  <div class="car"><img src="../sites/all/themes/basic/images/car.png"></div>
-
+	  
 </div> <!-- /page -->
     <?php print $closure; ?>
   </body>
