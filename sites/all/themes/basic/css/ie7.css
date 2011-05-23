@@ -34,3 +34,11 @@ ul.secondary li a:hover{
 			Strength=5);
 
 }
+.slideshow { height: 377px; width: 917px; margin: auto; 	background-color:black; }
+.slideshow img { padding: 0px; }
+.slideshow_holder{
+	background:url(/sites/all/themes/basic/images/front_bk.png)no-repeat;
+	width:960px;
+	height:425px;
+	margin-top:15px;
+}
